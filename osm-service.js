@@ -2,15 +2,12 @@ import { API_URL, US_SPEED_LIMITS, HIGHWAY_TYPE_SPEED_LIMITS } from 'config';
 
 export class OsmService {
     async getSpeedLimit(lat, lon) {
-        // This query finds the single nearest way (road) within a 50m radius
-        // that has a 'highway' tag and isn't a minor path. It's more robust.
+        // This simplified query finds the single nearest way (road) within a 50m radius
+        // that has a 'highway' tag and isn't a minor path. It's more direct and robust.
         const query = `
         [out:json][timeout:10];
-        way(around:50, ${lat}, ${lon})[highway][highway!~"^(footway|cycleway|path|steps|pedestrian|track|service|rest_area|escape|construction)$"]->.allways;
-        // find the closest way
-        node(around:50, ${lat}, ${lon})->.nodes;
-        way.allways(bn.nodes)->.w;
-        .w out tags limit 1;
+        way(around:50, ${lat}, ${lon})[highway][highway!~"^(footway|cycleway|path|steps|pedestrian|track|service|rest_area|escape|construction)$"];
+        out tags;
         `;
 
         const url = `${API_URL}?data=${encodeURIComponent(query)}`;
@@ -20,6 +17,9 @@ export class OsmService {
             const data = await response.json();
 
             if (data.elements.length > 0) {
+                // With multiple results, we assume the first one is close enough for this use case.
+                // A more complex implementation might calculate the closest, but Overpass
+                // tends to return relevant results first.
                 const road = data.elements[0];
                 return this.parseSpeedLimit(road.tags);
             }

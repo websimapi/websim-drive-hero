@@ -138,11 +138,8 @@ async function initGame() {
         const initialUnit = unitSwitch.checked ? 'KPH' : 'MPH';
         setUnit(initialUnit);
         game = new Game(initialUnit);
-        game.onSpeedLimitUpdate = (newLimit) => {
-            gps.setSpeedLimit(newLimit);
-        };
-        gps.onSpeedLimitFound = (newLimit) => {
-            game.setSpeedLimit(newLimit);
+        gps.onSpeedLimitFound = (limitData) => { // limitData is { limit, isKph } or null
+            game.setSpeedLimit(limitData);
         };
 
         // 5. Setup listeners

@@ -1,4 +1,4 @@
-import { POINT_RATE, SPEED_BUFFER } from 'config';
+import { POINT_RATE, SPEED_BUFFER, CONVERSION_FACTORS } from 'config';
 
 export class Game {
     constructor(unit) {
@@ -10,7 +10,6 @@ export class Game {
         this.isRunning = false;
         this.intervalId = null;
         this.unit = unit;
-        this.onSpeedLimitUpdate = () => {};
     }
 
     start() {
@@ -30,23 +29,37 @@ export class Game {
         if(this.unit === newUnit) return;
 
         // Convert speed limit if it exists
-        if (this.speedLimit !== null && typeof this.speedLimit === 'number') {
+        if (this.speedLimit !== null) {
             if (newUnit === 'KPH') {
-                this.speedLimit = Math.round(this.speedLimit * 1.60934);
+                this.speedLimit = Math.round(this.speedLimit * CONVERSION_FACTORS.MPH_TO_KPH);
             } else { // newUnit is MPH
-                this.speedLimit = Math.round(this.speedLimit / 1.60934);
+                this.speedLimit = Math.round(this.speedLimit / CONVERSION_FACTORS.MPH_TO_KPH);
             }
         }
         this.unit = newUnit;
-        this.onSpeedLimitUpdate(this.speedLimit);
     }
 
     updateSpeed(newSpeed) {
         this.speed = newSpeed;
     }
 
-    setSpeedLimit(newLimit) {
-        this.speedLimit = newLimit;
+    setSpeedLimit(limitData) { // Expects { limit, isKph } or null
+        if (limitData === null) {
+            this.speedLimit = null;
+            return;
+        }
+
+        let { limit, isKph } = limitData;
+        const currentUnit = this.unit;
+
+        // Convert the incoming speed limit to match the game's current unit setting.
+        if (isKph && currentUnit === 'MPH') {
+            limit = Math.round(limit / CONVERSION_FACTORS.MPH_TO_KPH);
+        } else if (!isKph && currentUnit === 'KPH') {
+            limit = Math.round(limit * CONVERSION_FACTORS.MPH_TO_KPH);
+        }
+        
+        this.speedLimit = limit;
     }
 
     update() {

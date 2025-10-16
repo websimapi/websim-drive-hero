@@ -5,10 +5,9 @@ import { OsmService } from 'osm-service';
 export class GpsService {
     constructor() {
         this.watchId = null;
-        this.currentSpeedLimit = null;
         this.lastApiCallTime = 0;
         this.apiCooldown = 10000; // 10 seconds
-        this.onSpeedLimitFound = () => {};
+        this.onSpeedLimitFound = () => {}; // Callback will pass { limit, isKph } or null
         this.osmService = new OsmService();
     }
 
@@ -65,32 +64,11 @@ export class GpsService {
         this.lastApiCallTime = now;
 
         try {
-            const limitData = await this.osmService.getSpeedLimit(lat, lon);
-            
-            if (limitData) {
-                let { limit, isKph } = limitData;
-
-                const currentUnit = getUnit();
-
-                // Perform unit conversions if necessary
-                if (isKph && currentUnit === 'MPH') {
-                    limit = Math.round(limit / CONVERSION_FACTORS.MPH_TO_KPH);
-                } else if (!isKph && currentUnit === 'KPH') {
-                    limit = Math.round(limit * CONVERSION_FACTORS.MPH_TO_KPH);
-                }
-                
-                if (limit !== this.currentSpeedLimit) {
-                    this.onSpeedLimitFound(limit);
-                }
-            } else {
-                // No speed limit found for the nearest road
-                this.onSpeedLimitFound(null);
-            }
-
+            const limitData = await this.osmService.getSpeedLimit(lat, lon); // limitData is { limit, isKph } or null
+            this.onSpeedLimitFound(limitData);
         } catch (error) {
             console.error('Error fetching speed limit:', error);
-            // In case of API error, maybe don't reset, as it could be temporary.
-            // Or we could call onSpeedLimitFound(null) here if we want to be strict.
+            this.onSpeedLimitFound(null); // Explicitly set to null on error
         }
     }
 }
