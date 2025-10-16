@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Drive Hero</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "main": "./main.js",
+            "gps": "./gps.js",
+            "game": "./game.js",
+            "ui": "./ui.js",
+            "config": "./config.js"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="app">
+        <div id="map"></div>
+        <div id="dashboard">
+            <div id="status-bar">
+                <div class="status-item score-container">
+                    <img src="star_icon.png" alt="Score" class="icon">
+                    <span id="score">0</span>
+                </div>
+                <div class="status-item speed-limit-container">
+                    <span class="label">LIMIT</span>
+                    <span id="speed-limit">--</span>
+                    <span class="unit" id="speed-limit-unit">MPH</span>
+                </div>
+            </div>
+            <div id="speedometer">
+                <div id="speedometer-display">
+                    <span id="speed">0</span>
+                    <span class="unit" id="speed-unit">MPH</span>
+                </div>
+            </div>
+            <div id="message-display">
+                <p id="message">Press Start to Begin</p>
+            </div>
+            <div id="controls">
+                <button id="start-stop-btn">
+                    <img src="play_icon.png" alt="Start" id="start-stop-icon">
+                </button>
+            </div>
+             <div class="unit-toggle">
+                <label>
+                    <input type="checkbox" id="unit-switch">
+                    <span class="slider"></span>
+                    <span class="label-mph">MPH</span>
+                    <span class="label-kph">KPH</span>
+                </label>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="main.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+
