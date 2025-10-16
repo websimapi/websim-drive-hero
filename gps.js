@@ -63,7 +63,15 @@ export class GpsService {
         }
         this.lastApiCallTime = now;
 
-        const query = `[out:json];way(around:25,${lat},${lon})[maxspeed];out tags;`;
+        // More robust query:
+        // 1. Find the closest way (road) of a suitable type near the user.
+        // 2. Then, get the tags (including maxspeed) for that specific way.
+        const query = `
+        [out:json];
+        way(around:25,${lat},${lon})[highway][highway!~"^(footway|cycleway|path|steps|pedestrian)$"]->.all_ways;
+        way(id:((way.all_ways.min(abs(sp(lat,lon)-osm_center_lat)+abs(sp(lat,lon)-osm_center_lon)))))->.closest_way;
+        .closest_way out tags;
+        `;
         const url = `${API_URL}?data=${encodeURIComponent(query)}`;
 
         try {
@@ -77,13 +85,12 @@ export class GpsService {
                 if (speedLimitStr) {
                     let limit = parseInt(speedLimitStr, 10);
                     
-                    if (speedLimitStr.includes('mph')) {
-                        // It's in MPH. Convert to KPH if needed.
+                    // Handle 'mph' suffix and unit conversions
+                    if (speedLimitStr.toLowerCase().includes('mph')) {
                         if (getUnit() === 'KPH') {
                            limit = Math.round(limit * CONVERSION_FACTORS.MPH_TO_KPH);
                         }
-                    } else {
-                        // Assume KPH. Convert to MPH if needed.
+                    } else { // Assume KPH if no unit is specified
                          if (getUnit() === 'MPH') {
                            limit = Math.round(limit / CONVERSION_FACTORS.MPH_TO_KPH);
                         }
@@ -92,13 +99,17 @@ export class GpsService {
                     if (!isNaN(limit) && limit !== this.currentSpeedLimit) {
                        this.onSpeedLimitFound(limit);
                     }
+                } else {
+                    // Closest road found, but it has no maxspeed tag.
+                    this.onSpeedLimitFound(null);
                 }
             } else {
-                 // No speed limit found, maybe reset it?
-                 // this.onSpeedLimitFound(null);
+                 // No roads found nearby, reset speed limit.
+                 this.onSpeedLimitFound(null);
             }
         } catch (error) {
             console.error('Error fetching speed limit:', error);
+            // In case of API error, maybe don't reset, as it could be temporary
         }
     }
 }

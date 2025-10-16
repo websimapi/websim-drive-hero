@@ -17,4 +17,3 @@ export const CONVERSION_FACTORS = {
 
 // OpenStreetMap Overpass API URL
 export const API_URL = 'https://overpass-api.de/api/interpreter';
-
