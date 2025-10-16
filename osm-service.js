@@ -1,28 +1,17 @@
 import { API_URL, US_SPEED_LIMITS, HIGHWAY_TYPE_SPEED_LIMITS } from 'config';
 
 export class OsmService {
-    constructor() {
-        this.roadCache = new Map(); // Cache road segments
-        this.cacheTimeout = 30000; // 30 seconds
-    }
-
     async getSpeedLimit(lat, lon, heading = null, speed = null) {
-        console.log(`🔍 Fetching speed limit for coordinates: ${lat.toFixed(6)}, ${lon.toFixed(6)}, heading: ${heading?.toFixed(1)}°, speed: ${speed?.toFixed(1)}mph`);
+        console.log(`🔍 Fetching speed limit for coordinates: ${lat}, ${lon}, heading: ${heading}, speed: ${speed}`);
         
-        // Determine search radius based on speed and accuracy needs
-        const baseRadius = speed > 50 ? 100 : 50; // Larger radius at highway speeds
-        const radii = [baseRadius, baseRadius * 2, baseRadius * 4];
+        // Try progressively larger search radii
+        const radii = [50, 100, 200, 500];
         
         for (const radius of radii) {
             console.log(`Attempting radius: ${radius}m`);
-            
-            // Build smarter query - exclude non-drivable roads
             const query = `
             [out:json][timeout:10];
-            way(around:${radius}, ${lat}, ${lon})
-              [highway]
-              [highway!~"^(footway|cycleway|path|steps|pedestrian|track|construction|bridleway|corridor|platform|proposed|raceway)$"]
-              [access!~"^(private|no)$"];
+            way(around:${radius}, ${lat}, ${lon})[highway][highway!~"^(footway|cycleway|path|steps|pedestrian|track|construction)$"];
             out geom;
             `;
 
@@ -35,37 +24,36 @@ export class OsmService {
                 console.log(`Found ${data.elements.length} roads within ${radius}m`);
 
                 if (data.elements.length > 0) {
-                    // Advanced scoring with map-matching
+                    // Score each road based on proximity and heading alignment
                     const scoredRoads = data.elements.map(road => {
-                        const match = this.mapMatchRoad(road, lat, lon, heading, speed);
-                        return { road, ...match };
+                        const score = this.scoreRoad(road, lat, lon, heading, speed);
+                        return { road, score };
                     });
                     
-                    // Sort by confidence score (highest first)
-                    scoredRoads.sort((a, b) => b.confidence - a.confidence);
+                    // Sort by score (highest first)
+                    scoredRoads.sort((a, b) => b.score - a.score);
                     
-                    console.log(`Top 3 roads by confidence:`, scoredRoads.slice(0, 3).map(r => ({
+                    console.log(`Top 3 roads by score:`, scoredRoads.slice(0, 3).map(r => ({
                         name: r.road.tags.name || 'Unnamed',
                         highway: r.road.tags.highway,
-                        confidence: r.confidence.toFixed(3),
-                        distance: r.distance.toFixed(1) + 'm',
-                        headingMatch: r.headingScore.toFixed(2)
+                        score: r.score.toFixed(2)
                     })));
                     
-                    // Use the best match if confidence is reasonable
-                    const bestMatch = scoredRoads[0];
-                    if (bestMatch.confidence > 0.3) {
-                        const speedLimit = this.parseSpeedLimit(bestMatch.road.tags);
+                    // Try roads in order of score
+                    for (const { road } of scoredRoads) {
+                        const speedLimit = this.parseSpeedLimit(road.tags);
                         if (speedLimit) {
-                            console.log(`✅ Speed limit found: ${speedLimit.limit} ${speedLimit.isKph ? 'KPH' : 'MPH'} (confidence: ${bestMatch.confidence.toFixed(2)})`);
-                            console.log(`Road: ${bestMatch.road.tags.name || 'Unnamed'} (${bestMatch.road.tags.highway})`);
-                            return {
-                                ...speedLimit,
-                                confidence: bestMatch.confidence,
-                                roadSegment: bestMatch.road,
-                                distance: bestMatch.distance
-                            };
+                            console.log(`✅ Speed limit found: ${speedLimit.limit} ${speedLimit.isKph ? 'KPH' : 'MPH'}`);
+                            console.log(`Road type: ${road.tags.highway}, Road name: ${road.tags.name || 'Unnamed'}`);
+                            return speedLimit;
                         }
+                    }
+                    
+                    console.log(`No explicit speed limits found, using top-scored road fallback...`);
+                    const fallbackLimit = this.parseSpeedLimit(scoredRoads[0].road.tags);
+                    if (fallbackLimit) {
+                        console.log(`✅ Using fallback speed limit: ${fallbackLimit.limit} ${fallbackLimit.isKph ? 'KPH' : 'MPH'}`);
+                        return fallbackLimit;
                     }
                 }
             } catch (error) {
@@ -73,106 +61,81 @@ export class OsmService {
             }
         }
         
-        console.warn('⚠️ No confident road match found - using default 35 MPH');
-        return { limit: 35, isKph: false, confidence: 0 };
+        console.warn('⚠️ No roads found within 500m - using default 35 MPH');
+        return { limit: 35, isKph: false };
     }
     
-    // Advanced map-matching algorithm
-    mapMatchRoad(road, userLat, userLon, userHeading, userSpeed) {
+    scoreRoad(road, userLat, userLon, userHeading, userSpeed) {
         if (!road.geometry || road.geometry.length < 2) {
-            return { confidence: 0, distance: Infinity, headingScore: 0 };
+            return 0;
         }
         
-        // Find closest point on road
+        // Find closest segment of the road to user
         let minDist = Infinity;
         let closestSegmentIndex = 0;
-        let closestPoint = null;
         
         for (let i = 0; i < road.geometry.length - 1; i++) {
             const p1 = road.geometry[i];
             const p2 = road.geometry[i + 1];
-            const result = this.pointToSegment(userLat, userLon, p1.lat, p1.lon, p2.lat, p2.lon);
+            const dist = this.distanceToSegment(userLat, userLon, p1.lat, p1.lon, p2.lat, p2.lon);
             
-            if (result.distance < minDist) {
-                minDist = result.distance;
+            if (dist < minDist) {
+                minDist = dist;
                 closestSegmentIndex = i;
-                closestPoint = result.point;
             }
         }
         
-        let confidence = 0;
-        let headingScore = 0;
+        let score = 1000 / (minDist + 1); // Base score on proximity
         
-        // Distance score (closer = better, exponential decay)
-        const distanceScore = Math.exp(-minDist / 20); // 20m half-life
-        confidence += distanceScore * 0.4;
-        
-        // Heading alignment score
-        if (userHeading !== null && userSpeed > 5) { // Only use heading when moving
+        // If we have heading and speed, boost score for roads aligned with direction of travel
+        if (userHeading !== null && userSpeed !== null && userSpeed > 1) {
             const p1 = road.geometry[closestSegmentIndex];
             const p2 = road.geometry[closestSegmentIndex + 1];
             
+            // Calculate road segment bearing
             const roadBearing = this.calculateBearing(p1.lat, p1.lon, p2.lat, p2.lon);
             
-            // Calculate smallest angle difference
+            // Calculate heading difference (accounting for 0/360 wrap)
             let headingDiff = Math.abs(userHeading - roadBearing);
             if (headingDiff > 180) {
                 headingDiff = 360 - headingDiff;
             }
             
-            // Check reverse direction too (might be on opposite side of divided highway)
-            const reverseHeadingDiff = Math.abs((userHeading - ((roadBearing + 180) % 360)));
-            const minHeadingDiff = Math.min(headingDiff, reverseHeadingDiff > 180 ? 360 - reverseHeadingDiff : reverseHeadingDiff);
+            // Boost score if heading aligns (within 45 degrees = good alignment)
+            const alignmentFactor = 1 - (headingDiff / 180);
+            score *= (1 + alignmentFactor * 2); // Up to 3x multiplier for perfect alignment
             
-            headingScore = 1 - (minHeadingDiff / 90); // 90° = no match, 0° = perfect match
-            headingScore = Math.max(0, headingScore);
-            
-            confidence += headingScore * 0.4;
-            
-            console.log(`Road ${road.tags.name || 'Unnamed'}: roadBearing=${roadBearing.toFixed(1)}°, userHeading=${userHeading.toFixed(1)}°, diff=${minHeadingDiff.toFixed(1)}°`);
-        } else {
-            confidence += 0.2; // Neutral when no heading available
+            console.log(`Road ${road.tags.name || 'Unnamed'}: bearing=${roadBearing.toFixed(1)}°, userHeading=${userHeading.toFixed(1)}°, diff=${headingDiff.toFixed(1)}°, alignment=${alignmentFactor.toFixed(2)}`);
         }
         
-        // Road type priority (major roads more likely)
-        const roadTypePriority = {
-            'motorway': 1.0,
-            'trunk': 0.95,
-            'primary': 0.9,
-            'secondary': 0.8,
-            'tertiary': 0.7,
-            'motorway_link': 0.85,
-            'trunk_link': 0.8,
-            'primary_link': 0.75,
-            'secondary_link': 0.7,
-            'residential': 0.6,
-            'unclassified': 0.5,
-            'living_street': 0.4,
-        };
-        
-        const typePriority = roadTypePriority[road.tags.highway] || 0.5;
-        confidence += typePriority * 0.2;
-        
-        // Bonus for named roads
-        if (road.tags.name && road.tags.name.length > 0) {
-            confidence += 0.1;
+        // Predict future position (2-3 seconds ahead) if moving
+        if (userHeading !== null && userSpeed !== null && userSpeed > 1) {
+            const futureSeconds = 2.5;
+            const metersAhead = userSpeed * 0.44704 * futureSeconds; // Convert mph to m/s and project ahead
+            const futureLat = this.projectLatitude(userLat, userHeading, metersAhead);
+            const futureLon = this.projectLongitude(userLat, userLon, userHeading, metersAhead);
+            
+            // Check if predicted position is closer to this road
+            let minFutureDist = Infinity;
+            for (let i = 0; i < road.geometry.length - 1; i++) {
+                const p1 = road.geometry[i];
+                const p2 = road.geometry[i + 1];
+                const dist = this.distanceToSegment(futureLat, futureLon, p1.lat, p1.lon, p2.lat, p2.lon);
+                minFutureDist = Math.min(minFutureDist, dist);
+            }
+            
+            // If future position is closer to this road, boost score
+            if (minFutureDist < minDist) {
+                score *= 1.5;
+                console.log(`Road ${road.tags.name || 'Unnamed'}: Future position closer! Current: ${minDist.toFixed(1)}m, Future: ${minFutureDist.toFixed(1)}m`);
+            }
         }
         
-        // Penalty for service roads, parking aisles
-        if (road.tags.highway === 'service' || road.tags.service === 'parking_aisle') {
-            confidence *= 0.3;
-        }
-        
-        return {
-            confidence: Math.min(confidence, 1),
-            distance: minDist,
-            headingScore: headingScore,
-            closestPoint: closestPoint
-        };
+        return score;
     }
     
-    // Point to line segment projection
-    pointToSegment(px, py, x1, y1, x2, y2) {
+    distanceToSegment(px, py, x1, y1, x2, y2) {
+        // Calculate distance from point (px, py) to line segment (x1,y1)-(x2,y2)
         const A = px - x1;
         const B = py - y1;
         const C = x2 - x1;
@@ -202,15 +165,11 @@ export class OsmService {
         const dx = px - xx;
         const dy = py - yy;
         
-        // Convert to meters
+        // Convert to meters (rough approximation)
         const latMeters = dy * 111000;
         const lonMeters = dx * 111000 * Math.cos(px * Math.PI / 180);
-        const distance = Math.sqrt(latMeters * latMeters + lonMeters * lonMeters);
         
-        return {
-            distance: distance,
-            point: { lat: xx, lon: yy }
-        };
+        return Math.sqrt(latMeters * latMeters + lonMeters * lonMeters);
     }
     
     calculateBearing(lat1, lon1, lat2, lon2) {
@@ -221,19 +180,24 @@ export class OsmService {
         const bearing = Math.atan2(y, x) * 180 / Math.PI;
         return (bearing + 360) % 360;
     }
+    
+    projectLatitude(lat, heading, meters) {
+        const headingRad = heading * Math.PI / 180;
+        const latChange = (meters * Math.cos(headingRad)) / 111000;
+        return lat + latChange;
+    }
+    
+    projectLongitude(lat, lon, heading, meters) {
+        const headingRad = heading * Math.PI / 180;
+        const lonChange = (meters * Math.sin(headingRad)) / (111000 * Math.cos(lat * Math.PI / 180));
+        return lon + lonChange;
+    }
 
     parseSpeedLimit(tags) {
         console.log(`Parsing tags:`, tags);
         
-        // Try explicit maxspeed first
         if (tags.maxspeed) {
             const speedStr = tags.maxspeed.toLowerCase();
-            
-            // Handle "none", "signals", "variable" etc.
-            if (speedStr === 'none' || speedStr === 'signals' || speedStr === 'variable') {
-                return this.getImpliedSpeedLimit(tags);
-            }
-            
             const limit = parseInt(speedStr, 10);
             if (isNaN(limit)) {
                 console.log(`Invalid maxspeed value: ${speedStr}`);
@@ -245,7 +209,6 @@ export class OsmService {
             return { limit, isKph };
         }
 
-        // Try maxspeed:type
         if (tags['maxspeed:type']) {
             const speedType = tags['maxspeed:type'];
             if (speedType.startsWith('US:') && US_SPEED_LIMITS[speedType]) {

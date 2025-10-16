@@ -80,18 +80,21 @@ function handlePositionUpdate(pos) {
     
     const oldState = game.getState();
     game.updateSpeed(convertedSpeed);
-    const { score, speedLimit, message, status } = game.getState();
+    const { score, speedLimit, message, status, lastStatus } = game.getState();
     
     console.log(`Current State - Speed: ${Math.round(convertedSpeed)} ${currentUnit}, Limit: ${speedLimit} ${currentUnit}, Status: ${status}`);
     
-    // Play status change sounds
-    if (oldState.status !== status && status !== 'NEUTRAL') {
-        if (status === 'GOOD') {
+    // Play status change sounds only when status actually changes
+    if (lastStatus !== status) {
+        if (status === 'STATIONARY') {
+            playSound(stationarySoundBuffer);
+            console.log('🔇 Playing stationary sound');
+        } else if (status === 'GOOD') {
             playSound(goodDrivingSoundBuffer);
+            console.log('✅ Playing good driving sound');
         } else if (status === 'BAD') {
             playSound(speedingSoundBuffer);
-        } else if (status === 'STATIONARY') {
-            playSound(stationarySoundBuffer);
+            console.log('⚠️ Playing speeding sound');
         }
     }
     

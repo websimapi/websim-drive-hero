@@ -6,7 +6,8 @@ export class Game {
         this.speed = 0;
         this.speedLimit = null;
         this.message = "Press Start to Begin";
-        this.status = "NEUTRAL"; // GOOD, BAD, NEUTRAL
+        this.status = "NEUTRAL";
+        this.lastStatus = "NEUTRAL"; // Track previous status
         this.isRunning = false;
         this.intervalId = null;
         this.unit = unit;
@@ -74,7 +75,10 @@ export class Game {
         const buffer = SPEED_BUFFER[this.unit];
         const isSpeeding = this.speed > this.speedLimit;
         const isTooSlow = this.speed < this.speedLimit - buffer;
-        const isStationary = this.speed < 5; // Consider stationary if under 5 mph/kph
+        const isStationary = this.speed < 5;
+
+        // Store previous status before updating
+        this.lastStatus = this.status;
 
         if (isStationary) {
             this.message = "Stationary or too slow";
@@ -100,6 +104,7 @@ export class Game {
             speedLimit: this.speedLimit,
             message: this.message,
             status: this.status,
+            lastStatus: this.lastStatus,
         };
     }
 }

@@ -14,6 +14,11 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 html, body {
@@ -90,9 +95,10 @@ html, body {
 }
 
 #map {
-    height: 40%;
+    height: 35%;
     width: 100%;
     background-color: #333;
+    touch-action: pan-x pan-y;
 }
 
 #dashboard {
@@ -101,54 +107,58 @@ html, body {
     flex-direction: column;
     justify-content: space-around;
     align-items: center;
-    padding: 10px 20px;
+    padding: 15px 20px;
     background-color: var(--primary-bg);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 #status-bar {
     display: flex;
     justify-content: space-between;
     width: 100%;
-    font-size: 1.5rem;
+    max-width: 400px;
+    font-size: 1.3rem;
     font-weight: bold;
+    gap: 10px;
 }
 
 .status-item {
     display: flex;
     align-items: center;
     background-color: var(--secondary-bg);
-    padding: 10px 15px;
-    border-radius: 20px;
-    min-width: 100px;
+    padding: 8px 12px;
+    border-radius: 15px;
+    min-width: 80px;
     justify-content: center;
 }
 
 .icon {
-    width: 24px;
-    height: 24px;
-    margin-right: 8px;
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
 }
 
 #speed-limit-container {
     flex-direction: column;
-    padding: 5px 15px;
+    padding: 5px 12px;
     text-align: center;
 }
 #speed-limit-container .label {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     font-weight: normal;
 }
 #speed-limit-container #speed-limit {
-    font-size: 2rem;
+    font-size: 1.8rem;
     line-height: 1;
 }
 #speed-limit-container .unit {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
 }
 
 #speedometer {
-    width: 200px;
-    height: 200px;
+    width: 180px;
+    height: 180px;
     border-radius: 50%;
     background: radial-gradient(circle, var(--accent-color) 0%, var(--primary-bg) 70%);
     display: flex;
@@ -156,6 +166,7 @@ html, body {
     align-items: center;
     border: 5px solid var(--secondary-bg);
     transition: border-color 0.5s ease;
+    margin: 10px 0;
 }
 
 #speedometer-display {
@@ -163,35 +174,41 @@ html, body {
 }
 
 #speed {
-    font-size: 4rem;
+    font-size: 3.5rem;
     font-weight: bold;
     line-height: 1;
 }
 
 #speedometer-display .unit {
-    font-size: 1.2rem;
+    font-size: 1rem;
     display: block;
 }
 
 #message-display {
-    min-height: 40px;
+    min-height: 50px;
     text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
 }
 
 #message {
     font-size: 1rem;
     font-weight: 500;
     color: var(--text-color);
-    opacity: 0.8;
+    opacity: 0.9;
+    line-height: 1.4;
 }
 
 #controls {
     text-align: center;
+    margin: 10px 0;
 }
 
 #start-stop-btn {
-    width: 80px;
-    height: 80px;
+    width: 70px;
+    height: 70px;
     border-radius: 50%;
     border: none;
     background-color: var(--secondary-bg);
@@ -202,23 +219,24 @@ html, body {
     align-items: center;
     box-shadow: 0 4px 15px rgba(0,0,0,0.4);
     transition: transform 0.2s;
+    -webkit-tap-highlight-color: transparent;
 }
 
 #start-stop-btn:active {
-    transform: scale(0.95);
+    transform: scale(0.9);
 }
 
 #start-stop-icon {
-    width: 40px;
-    height: 40px;
+    width: 35px;
+    height: 35px;
 }
 
 .unit-toggle-container {
-    position: absolute;
-    bottom: 20px;
+    position: relative;
     width: 100%;
     display: flex;
     justify-content: center;
+    margin-top: 10px;
 }
 
 .unit-toggle {
@@ -281,4 +299,39 @@ input:checked + .slider:before {
 }
 .label-kph {
     right: 15px;
+}
+
+/* Mobile optimizations */
+@media (max-width: 375px) {
+    #speedometer {
+        width: 160px;
+        height: 160px;
+    }
+    
+    #speed {
+        font-size: 3rem;
+    }
+    
+    #status-bar {
+        font-size: 1.2rem;
+    }
+    
+    #message {
+        font-size: 0.9rem;
+    }
+}
+
+@media (min-height: 700px) {
+    #map {
+        height: 40%;
+    }
+    
+    #speedometer {
+        width: 200px;
+        height: 200px;
+    }
+    
+    #speed {
+        font-size: 4rem;
+    }
 }
