@@ -17,3 +17,15 @@ export const CONVERSION_FACTORS = {
 
 // OpenStreetMap Overpass API URL
 export const API_URL = 'https://overpass-api.de/api/interpreter';
+
+// Default speed limits for 'maxspeed:type' tags in the US (in MPH)
+// This is not exhaustive and is a simplified heuristic.
+// Source: https://wiki.openstreetmap.org/wiki/Key:maxspeed:type
+export const US_SPEED_LIMITS = {
+    'US:motorway': 65,
+    'US:rural': 55,
+    'US:urban': 35,
+    'US:residential': 25,
+    'US:school_zone': 20,
+    'US:alley': 15,
+};

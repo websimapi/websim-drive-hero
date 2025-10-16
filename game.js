@@ -30,7 +30,7 @@ export class Game {
         if(this.unit === newUnit) return;
 
         // Convert speed limit if it exists
-        if (this.speedLimit !== null) {
+        if (this.speedLimit !== null && typeof this.speedLimit === 'number') {
             if (newUnit === 'KPH') {
                 this.speedLimit = Math.round(this.speedLimit * 1.60934);
             } else { // newUnit is MPH

@@ -1,5 +1,6 @@
 import { getUnit } from 'ui';
-import { API_URL, CONVERSION_FACTORS } from 'config';
+import { CONVERSION_FACTORS } from 'config';
+import { OsmService } from 'osm-service';
 
 export class GpsService {
     constructor() {
@@ -8,7 +9,7 @@ export class GpsService {
         this.lastApiCallTime = 0;
         this.apiCooldown = 10000; // 10 seconds
         this.onSpeedLimitFound = () => {};
-        this.unit = 'MPH'; // Will be updated from game
+        this.osmService = new OsmService();
     }
 
     setSpeedLimit(limit) {
@@ -63,53 +64,33 @@ export class GpsService {
         }
         this.lastApiCallTime = now;
 
-        // More robust query:
-        // 1. Find the closest way (road) of a suitable type near the user.
-        // 2. Then, get the tags (including maxspeed) for that specific way.
-        const query = `
-        [out:json];
-        way(around:25,${lat},${lon})[highway][highway!~"^(footway|cycleway|path|steps|pedestrian)$"]->.all_ways;
-        way(id:((way.all_ways.min(abs(sp(lat,lon)-osm_center_lat)+abs(sp(lat,lon)-osm_center_lon)))))->.closest_way;
-        .closest_way out tags;
-        `;
-        const url = `${API_URL}?data=${encodeURIComponent(query)}`;
-
         try {
-            const response = await fetch(url);
-            const data = await response.json();
+            const limitData = await this.osmService.getSpeedLimit(lat, lon);
+            
+            if (limitData) {
+                let { limit, isKph } = limitData;
 
-            if (data.elements.length > 0) {
-                const road = data.elements[0];
-                let speedLimitStr = road.tags.maxspeed;
+                const currentUnit = getUnit();
+
+                // Perform unit conversions if necessary
+                if (isKph && currentUnit === 'MPH') {
+                    limit = Math.round(limit / CONVERSION_FACTORS.MPH_TO_KPH);
+                } else if (!isKph && currentUnit === 'KPH') {
+                    limit = Math.round(limit * CONVERSION_FACTORS.MPH_TO_KPH);
+                }
                 
-                if (speedLimitStr) {
-                    let limit = parseInt(speedLimitStr, 10);
-                    
-                    // Handle 'mph' suffix and unit conversions
-                    if (speedLimitStr.toLowerCase().includes('mph')) {
-                        if (getUnit() === 'KPH') {
-                           limit = Math.round(limit * CONVERSION_FACTORS.MPH_TO_KPH);
-                        }
-                    } else { // Assume KPH if no unit is specified
-                         if (getUnit() === 'MPH') {
-                           limit = Math.round(limit / CONVERSION_FACTORS.MPH_TO_KPH);
-                        }
-                    }
-
-                    if (!isNaN(limit) && limit !== this.currentSpeedLimit) {
-                       this.onSpeedLimitFound(limit);
-                    }
-                } else {
-                    // Closest road found, but it has no maxspeed tag.
-                    this.onSpeedLimitFound(null);
+                if (limit !== this.currentSpeedLimit) {
+                    this.onSpeedLimitFound(limit);
                 }
             } else {
-                 // No roads found nearby, reset speed limit.
-                 this.onSpeedLimitFound(null);
+                // No speed limit found for the nearest road
+                this.onSpeedLimitFound(null);
             }
+
         } catch (error) {
             console.error('Error fetching speed limit:', error);
-            // In case of API error, maybe don't reset, as it could be temporary
+            // In case of API error, maybe don't reset, as it could be temporary.
+            // Or we could call onSpeedLimitFound(null) here if we want to be strict.
         }
     }
 }
