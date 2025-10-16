@@ -2,60 +2,51 @@ import { getUnit } from 'ui';
 import { API_URL, CONVERSION_FACTORS } from 'config';
 
 export class GpsService {
-    constructor(unit) {
+    constructor() {
         this.watchId = null;
         this.currentSpeedLimit = null;
         this.lastApiCallTime = 0;
         this.apiCooldown = 10000; // 10 seconds
         this.onSpeedLimitFound = () => {};
-        this.unit = unit;
+        this.unit = 'MPH'; // Will be updated from game
     }
 
     setSpeedLimit(limit) {
         this.currentSpeedLimit = limit;
     }
 
-    async start(successCallback, errorCallback) {
-        if (!navigator.geolocation) {
-            throw new Error("Geolocation is not supported by your browser.");
-        }
-
+    requestLocation() {
         return new Promise((resolve, reject) => {
-            const options = {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            };
-
-            // Wrap callbacks to include speed limit fetching
-            const handleSuccess = async (pos) => {
-                await this.fetchSpeedLimit(pos.coords.latitude, pos.coords.longitude);
-                successCallback(pos);
-            };
-
-            const handleError = (err) => {
-                errorCallback(err);
-                reject(err); // reject promise on first error
-            };
-
-            // Get an initial position to make sure permissions are granted before starting the watch
+            if (!navigator.geolocation) {
+                return reject(new Error("Geolocation is not supported by your browser."));
+            }
             navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    this.watchId = navigator.geolocation.watchPosition(handleSuccess, handleError, options);
-                    handleSuccess(pos); // Process initial position
-                    resolve();
-                },
+                resolve,
                 (err) => {
-                    let message = "Could not get location. Please enable location services.";
+                    let message = "Could not get location. Please enable location services and refresh.";
                     if (err.code === 1) { // PERMISSION_DENIED
-                        message = "Location permission denied. Please enable it in your browser settings.";
+                        message = "Location permission denied. Please enable it in your browser settings and refresh.";
                     }
-                    errorCallback({ ...err, message });
                     reject(new Error(message));
                 },
-                options
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
             );
         });
+    }
+
+    async start(successCallback, errorCallback) {
+        const options = {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        };
+
+        const handleSuccess = async (pos) => {
+            await this.fetchSpeedLimit(pos.coords.latitude, pos.coords.longitude);
+            successCallback(pos);
+        };
+
+        this.watchId = navigator.geolocation.watchPosition(handleSuccess, errorCallback, options);
     }
 
     stop() {
@@ -111,4 +102,3 @@ export class GpsService {
         }
     }
 }
-

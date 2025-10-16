@@ -24,8 +24,8 @@ export function setUnit(newUnit) {
     unit = newUnit;
 }
 
-export function initUI() {
-    map = L.map('map').setView([51.505, -0.09], 13);
+export function initUI(lat, lon) {
+    map = L.map('map').setView([lat, lon], 16);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap'
@@ -37,8 +37,7 @@ export function initUI() {
         iconAnchor: [16, 16],
     });
     
-    userMarker = L.marker([0, 0], { icon: userIcon }).addTo(map);
-    showMessage("Waiting for location...");
+    userMarker = L.marker([lat, lon], { icon: userIcon }).addTo(map);
 }
 
 export function updateUI(state) {
@@ -77,4 +76,3 @@ export function updateUI(state) {
 export function showMessage(msg) {
     UIElements.message.textContent = msg;
 }
-

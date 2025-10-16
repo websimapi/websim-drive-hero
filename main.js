@@ -6,6 +6,10 @@ import { CONVERSION_FACTORS } from 'config';
 const startStopBtn = document.getElementById('start-stop-btn');
 const startStopIcon = document.getElementById('start-stop-icon');
 const unitSwitch = document.getElementById('unit-switch');
+const enableLocationBtn = document.getElementById('enable-location-btn');
+const startupOverlay = document.getElementById('startup-overlay');
+const startupError = document.getElementById('startup-error');
+const appElement = document.getElementById('app');
 
 let isRunning = false;
 let game;
@@ -22,6 +26,9 @@ async function setupAudio() {
 
 function playPointSound() {
     if (!audioContext || !pointSoundBuffer) return;
+    if (audioContext.state === 'suspended') {
+        audioContext.resume();
+    }
     const source = audioContext.createBufferSource();
     source.buffer = pointSoundBuffer;
     source.connect(audioContext.destination);
@@ -111,23 +118,48 @@ function handleUnitChange() {
     updateUI({unit: newUnit, speedLimit: game.getState().speedLimit, speed: 0});
 }
 
-function init() {
-    initUI();
-    const initialUnit = unitSwitch.checked ? 'KPH' : 'MPH';
-    setUnit(initialUnit);
-    game = new Game(initialUnit);
-    gps = new GpsService(initialUnit);
-    game.onSpeedLimitUpdate = (newLimit) => {
-        gps.setSpeedLimit(newLimit);
-    };
-    gps.onSpeedLimitFound = (newLimit) => {
-        game.setSpeedLimit(newLimit);
-    };
+async function initGame() {
+    try {
+        // 1. Get initial position to confirm permission and location
+        const initialPos = await gps.requestLocation();
+        
+        // 2. Hide overlay and show app
+        startupOverlay.style.display = 'none';
+        appElement.classList.remove('hidden');
 
-    startStopBtn.addEventListener('click', toggleGame);
-    unitSwitch.addEventListener('change', handleUnitChange);
-    setupAudio().catch(err => console.error("Audio setup failed:", err));
+        // 3. Initialize UI with the first location
+        initUI(initialPos.coords.latitude, initialPos.coords.longitude);
+        updateUI({
+            lat: initialPos.coords.latitude,
+            lon: initialPos.coords.longitude,
+        });
+
+        // 4. Setup the rest of the game
+        const initialUnit = unitSwitch.checked ? 'KPH' : 'MPH';
+        setUnit(initialUnit);
+        game = new Game(initialUnit);
+        game.onSpeedLimitUpdate = (newLimit) => {
+            gps.setSpeedLimit(newLimit);
+        };
+        gps.onSpeedLimitFound = (newLimit) => {
+            game.setSpeedLimit(newLimit);
+        };
+
+        // 5. Setup listeners
+        startStopBtn.addEventListener('click', toggleGame);
+        unitSwitch.addEventListener('change', handleUnitChange);
+        await setupAudio();
+
+    } catch (error) {
+        startupError.textContent = error.message;
+        console.error("Initialization failed:", error);
+    }
+}
+
+
+function init() {
+    gps = new GpsService();
+    enableLocationBtn.addEventListener('click', initGame);
 }
 
 init();
-
