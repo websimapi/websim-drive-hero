@@ -14,6 +14,7 @@ const statusColors = {
     GOOD: 'var(--good-driving)',
     BAD: 'var(--bad-driving)',
     NEUTRAL: 'var(--neutral-driving)',
+    STATIONARY: 'var(--stationary-color)',
 };
 
 export function getUnit() {

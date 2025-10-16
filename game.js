@@ -74,8 +74,12 @@ export class Game {
         const buffer = SPEED_BUFFER[this.unit];
         const isSpeeding = this.speed > this.speedLimit;
         const isTooSlow = this.speed < this.speedLimit - buffer;
+        const isStationary = this.speed < 5; // Consider stationary if under 5 mph/kph
 
-        if (isSpeeding) {
+        if (isStationary) {
+            this.message = "Stationary or too slow";
+            this.status = "STATIONARY";
+        } else if (isSpeeding) {
             this.message = "Too fast! Slow down.";
             this.status = "BAD";
         } else if (isTooSlow) {

@@ -16,12 +16,43 @@ let game;
 let gps;
 let audioContext;
 let pointSoundBuffer;
+let stationarySoundBuffer;
+let goodDrivingSoundBuffer;
+let speedingSoundBuffer;
 
 async function setupAudio() {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const response = await fetch('point_sound.mp3');
-    const arrayBuffer = await response.arrayBuffer();
-    pointSoundBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    
+    // Load point sound
+    const pointResponse = await fetch('point_sound.mp3');
+    const pointArrayBuffer = await pointResponse.arrayBuffer();
+    pointSoundBuffer = await audioContext.decodeAudioData(pointArrayBuffer);
+    
+    // Load stationary sound
+    const stationaryResponse = await fetch('stationary_sound.mp3');
+    const stationaryArrayBuffer = await stationaryResponse.arrayBuffer();
+    stationarySoundBuffer = await audioContext.decodeAudioData(stationaryArrayBuffer);
+    
+    // Load good driving sound
+    const goodResponse = await fetch('good_driving_sound.mp3');
+    const goodArrayBuffer = await goodResponse.arrayBuffer();
+    goodDrivingSoundBuffer = await audioContext.decodeAudioData(goodArrayBuffer);
+    
+    // Load speeding sound
+    const speedingResponse = await fetch('speeding_sound.mp3');
+    const speedingArrayBuffer = await speedingResponse.arrayBuffer();
+    speedingSoundBuffer = await audioContext.decodeAudioData(speedingArrayBuffer);
+}
+
+function playSound(buffer) {
+    if (!audioContext || !buffer) return;
+    if (audioContext.state === 'suspended') {
+        audioContext.resume();
+    }
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContext.destination);
+    source.start(0);
 }
 
 function playPointSound() {
@@ -47,14 +78,26 @@ function handlePositionUpdate(pos) {
     const currentUnit = getUnit();
     const convertedSpeed = speed * CONVERSION_FACTORS[currentUnit];
     
+    const oldState = game.getState();
     game.updateSpeed(convertedSpeed);
     const { score, speedLimit, message, status } = game.getState();
     
     console.log(`Current State - Speed: ${Math.round(convertedSpeed)} ${currentUnit}, Limit: ${speedLimit} ${currentUnit}, Status: ${status}`);
     
+    // Play status change sounds
+    if (oldState.status !== status && status !== 'NEUTRAL') {
+        if (status === 'GOOD') {
+            playSound(goodDrivingSoundBuffer);
+        } else if (status === 'BAD') {
+            playSound(speedingSoundBuffer);
+        } else if (status === 'STATIONARY') {
+            playSound(stationarySoundBuffer);
+        }
+    }
+    
     const oldScore = parseInt(document.getElementById('score').textContent, 10);
     if(score > oldScore) {
-        playPointSound();
+        playSound(pointSoundBuffer);
     }
 
     updateUI({
