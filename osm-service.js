@@ -1,17 +1,16 @@
-import { API_URL, US_SPEED_LIMITS } from 'config';
+import { API_URL, US_SPEED_LIMITS, HIGHWAY_TYPE_SPEED_LIMITS } from 'config';
 
 export class OsmService {
     async getSpeedLimit(lat, lon) {
-        // Query for the nearest road with a highway tag, and get its tags.
+        // This query finds the single nearest way (road) within a 50m radius
+        // that has a 'highway' tag and isn't a minor path. It's more robust.
         const query = `
         [out:json][timeout:10];
-        // find nearest way to point
-        way(around:50, ${lat}, ${lon})[highway][highway!~"^(footway|cycleway|path|steps|pedestrian|track|service|rest_area|escape)$"]->.ways;
-        // get tags of the nearest way
-        (
-          way.ways(filter:select(0, min(geodist(center(geom), ${lat}, ${lon}))));
-        );
-        out tags;
+        way(around:50, ${lat}, ${lon})[highway][highway!~"^(footway|cycleway|path|steps|pedestrian|track|service|rest_area|escape|construction)$"]->.allways;
+        // find the closest way
+        node(around:50, ${lat}, ${lon})->.nodes;
+        way.allways(bn.nodes)->.w;
+        .w out tags limit 1;
         `;
 
         const url = `${API_URL}?data=${encodeURIComponent(query)}`;
@@ -35,7 +34,7 @@ export class OsmService {
         if (tags.maxspeed) {
             const speedStr = tags.maxspeed.toLowerCase();
             const limit = parseInt(speedStr, 10);
-            if (isNaN(limit)) return null;
+            if (isNaN(limit)) return this.getImpliedSpeedLimit(tags);
 
             const isKph = !speedStr.includes('mph');
             return { limit, isKph };
@@ -46,9 +45,17 @@ export class OsmService {
             if (speedType.startsWith('US:') && US_SPEED_LIMITS[speedType]) {
                 return { limit: US_SPEED_LIMITS[speedType], isKph: false }; // US limits are in MPH
             }
-            // Could add more parsers for other countries here, e.g. DE, UK etc.
         }
+        
+        // Fallback to implied speed limit based on highway type
+        return this.getImpliedSpeedLimit(tags);
+    }
 
-        return null; // No parsable speed limit tag found
+    getImpliedSpeedLimit(tags) {
+        if (tags.highway && HIGHWAY_TYPE_SPEED_LIMITS[tags.highway]) {
+            // Implied speed limits from config are in MPH
+            return { limit: HIGHWAY_TYPE_SPEED_LIMITS[tags.highway], isKph: false };
+        }
+        return null; // No parsable or implied speed limit found
     }
 }

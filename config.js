@@ -29,3 +29,21 @@ export const US_SPEED_LIMITS = {
     'US:school_zone': 20,
     'US:alley': 15,
 };
+
+// Fallback speed limits for common highway types if no maxspeed is tagged (in MPH)
+// These are very rough estimates for US roads.
+export const HIGHWAY_TYPE_SPEED_LIMITS = {
+    'motorway': 65,
+    'trunk': 60,
+    'primary': 55,
+    'secondary': 45,
+    'tertiary': 35,
+    'unclassified': 30,
+    'residential': 25,
+    'motorway_link': 45,
+    'trunk_link': 45,
+    'primary_link': 35,
+    'secondary_link': 30,
+    'tertiary_link': 25,
+    'living_street': 15,
+};

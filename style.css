@@ -212,11 +212,18 @@ html, body {
     height: 40px;
 }
 
+.unit-toggle-container {
+    position: absolute;
+    bottom: 20px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
 .unit-toggle {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-top: 10px;
 }
 
 .unit-toggle label {
