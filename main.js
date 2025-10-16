@@ -37,7 +37,7 @@ function playPointSound() {
 
 function handlePositionUpdate(pos) {
     const coords = pos.coords;
-    const speed = coords.speed; // meters per second
+    const speed = coords.speed;
 
     if (speed === null) {
         showMessage("Waiting for speed data...");
@@ -49,6 +49,8 @@ function handlePositionUpdate(pos) {
     
     game.updateSpeed(convertedSpeed);
     const { score, speedLimit, message, status } = game.getState();
+    
+    console.log(`Current State - Speed: ${Math.round(convertedSpeed)} ${currentUnit}, Limit: ${speedLimit} ${currentUnit}, Status: ${status}`);
     
     const oldScore = parseInt(document.getElementById('score').textContent, 10);
     if(score > oldScore) {

@@ -56,7 +56,9 @@ export function updateUI(state) {
     }
 
     if (state.speedLimit !== undefined) {
-        UIElements.speedLimit.textContent = state.speedLimit !== null ? state.speedLimit : '--';
+        const displayLimit = state.speedLimit !== null ? state.speedLimit : '--';
+        UIElements.speedLimit.textContent = displayLimit;
+        console.log(`📊 UI updated - Speed Limit: ${displayLimit}`);
     }
 
     if(state.message) {

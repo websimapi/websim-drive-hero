@@ -6,9 +6,10 @@ export class GpsService {
     constructor() {
         this.watchId = null;
         this.lastApiCallTime = 0;
-        this.apiCooldown = 10000; // 10 seconds
-        this.onSpeedLimitFound = () => {}; // Callback will pass { limit, isKph } or null
+        this.apiCooldown = 5000; // Reduced to 5 seconds for faster updates
+        this.onSpeedLimitFound = () => {};
         this.osmService = new OsmService();
+        this.hasFoundInitialSpeedLimit = false;
     }
 
     setSpeedLimit(limit) {
@@ -24,7 +25,7 @@ export class GpsService {
                 resolve,
                 (err) => {
                     let message = "Could not get location. Please enable location services and refresh.";
-                    if (err.code === 1) { // PERMISSION_DENIED
+                    if (err.code === 1) {
                         message = "Location permission denied. Please enable it in your browser settings and refresh.";
                     }
                     reject(new Error(message));
@@ -42,7 +43,14 @@ export class GpsService {
         };
 
         const handleSuccess = async (pos) => {
-            await this.fetchSpeedLimit(pos.coords.latitude, pos.coords.longitude);
+            // Fetch speed limit immediately on first position
+            if (!this.hasFoundInitialSpeedLimit) {
+                console.log('📍 First position received, fetching speed limit immediately...');
+                await this.fetchSpeedLimit(pos.coords.latitude, pos.coords.longitude);
+                this.hasFoundInitialSpeedLimit = true;
+            } else {
+                await this.fetchSpeedLimit(pos.coords.latitude, pos.coords.longitude);
+            }
             successCallback(pos);
         };
 
@@ -54,21 +62,25 @@ export class GpsService {
             navigator.geolocation.clearWatch(this.watchId);
             this.watchId = null;
         }
+        this.hasFoundInitialSpeedLimit = false;
     }
     
     async fetchSpeedLimit(lat, lon) {
         const now = Date.now();
-        if (now - this.lastApiCallTime < this.apiCooldown) {
+        if (now - this.lastApiCallTime < this.apiCooldown && this.hasFoundInitialSpeedLimit) {
             return;
         }
         this.lastApiCallTime = now;
 
+        console.log('🌐 Calling Overpass API...');
         try {
-            const limitData = await this.osmService.getSpeedLimit(lat, lon); // limitData is { limit, isKph } or null
+            const limitData = await this.osmService.getSpeedLimit(lat, lon);
+            console.log('Speed limit data received:', limitData);
             this.onSpeedLimitFound(limitData);
         } catch (error) {
-            console.error('Error fetching speed limit:', error);
-            this.onSpeedLimitFound(null); // Explicitly set to null on error
+            console.error('❌ Error fetching speed limit:', error);
+            // Use default instead of null
+            this.onSpeedLimitFound({ limit: 35, isKph: false });
         }
     }
 }
